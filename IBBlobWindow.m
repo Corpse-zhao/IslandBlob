@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.4.6";
+static NSString * const kIBVersion = @"0.4.7";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -146,64 +146,51 @@ static UIWindow *IBKeyWindow(void)
 //    appendPath 进同一条路径后 nonzero 规则会把重叠区填成透明洞。
 //    0.2.0 起每块形状单独一个 CAShapeLayer，黑上叠黑，永不露底。
 //
-// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.5：
-//   · 横杠 y27..62，长 126pt = 与灵动岛本体等长（用户要求"跟灵动岛一样长"），圆角 = 高/2
-//   · 左上瓣 d48：圆心高于横杠中线 6.7pt，探出横杠上缘、压住横杠左端
-//   · 左下瓣 d40：小一号，圆心低于中线 11.7pt，垂在横杠下方
-//   · 右端"桃屁股"：**不是圆球**。两瓣（上下各一元）横向错开、中间留内凹缺口，
-//     右缘形成"瓣-凹-瓣"的桃子屁股轮廓（心形旋转 90° 朝右的下半）
-//   参考图 430×155 像素测量换算（k≈0.427），整体水平不旋转
+// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.7 按参考图重新拟合（阈值 60，analyze_ref2.py）：
+//   图 430×155：横条 242×78px（右倾 3.5° 为翻拍角度，实机水平）、左上瓣 d88、左下瓣 d94、
+//   右端 = d100 大圆且圆心低于横条中线 12px（上缘与横条齐平、下缘下垂 → 视觉为朝右下的桃尖）
+//   以横条长 = 灵动岛 126pt 定 k=0.521：
+//   · 横杠 (cx-63, 28, 126, 40) r20 —— 与岛等长
+//   · 左上瓣 d46：圆心 (cx-92.7, 27.7)，高于横杠中线 20.3pt
+//   · 左下瓣 d49：圆心 (cx-92.7, 56.9)，低于中线 8.9pt，两瓣间自然形成心形凹口
+//   · 右端桃尖：d52 圆，圆心 (cx+76, 54.3) —— 上缘与横杠齐平、下缘垂 12pt
 static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloat sy, CGFloat ox, CGFloat oy)
 {
 	CGFloat cx = width / 2.0;
 	NSMutableArray<UIBezierPath *> *paths = [NSMutableArray array];
 
-	// 用户调节：以 (cx, 45) 为锚点（屏幕水平中心 + 形状纵向中心）等比缩放 + 平移（sx == sy，永不变形）
-	CGAffineTransform t = CGAffineTransformMakeTranslation(cx + ox, 45.0 + oy);
+	// 用户调节：以 (cx, 43) 为锚点（形状包围盒中心）等比缩放 + 平移（sx == sy，永不变形）
+	CGAffineTransform t = CGAffineTransformMakeTranslation(cx + ox, 43.0 + oy);
 	t = CGAffineTransformScale(t, sx, sy);
-	t = CGAffineTransformTranslate(t, -cx, -45.0);
+	t = CGAffineTransformTranslate(t, -cx, -43.0);
 
-	// 左上瓣（大，探出横杠上缘）
+	// 左上瓣（心形上瓣；圆心比图测值右移 15pt 嵌入横杠，保证与横杠实连）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 100.0, 13.8, 48.0, 48.0)];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 100.7, 4.7, 46.0, 46.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
-	// 左下瓣（小一号，偏左下，垂在横杠下方）
+	// 左下瓣（略大，心形下瓣）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 98.0, 36.2, 40.0, 40.0)];
-		[path applyTransform:t];
-		[paths addObject:path];
-	}
-
-	// 中间横杠（长 126pt = 灵动岛本体长度，圆角 17.5）
-	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 63.0, 27.0, 126.0, 35.0)
-														cornerRadius:17.5];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 102.2, 32.4, 49.0, 49.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
 
-	// 右端"桃尖"：朝右收窄的单一体（不是屁股双瓣），最右端略带弧度收钝
-	//   上下缘从横杠内 (cx+58, 27/63) 平滑外扩，到 (cx+83, 24/66) 后向内收，
-	//   尖端 (cx+98, 45) 用一段贝塞尔过渡，形成圆润的锐角
-	UIBezierPath *tip = [UIBezierPath bezierPath];
-	[tip moveToPoint:CGPointMake(cx + 58.0, 27.0)];                          // 起点（藏于横杠内）
-	[tip addCurveToPoint:CGPointMake(cx + 83.0, 24.0)                        // 上缘外扩至最宽处
-	   controlPoint1:CGPointMake(cx + 68.0, 27.0)
-	   controlPoint2:CGPointMake(cx + 75.0, 24.0)];
-	[tip addCurveToPoint:CGPointMake(cx + 98.0, 45.0)                        // 收到尖端（圆润）
-	   controlPoint1:CGPointMake(cx + 92.0, 24.0)
-	   controlPoint2:CGPointMake(cx + 98.0, 36.0)];
-	[tip addCurveToPoint:CGPointMake(cx + 83.0, 66.0)                        // 尖端转下缘
-	   controlPoint1:CGPointMake(cx + 98.0, 54.0)
-	   controlPoint2:CGPointMake(cx + 92.0, 66.0)];
-	[tip addCurveToPoint:CGPointMake(cx + 58.0, 63.0)                        // 下缘回到横杠内
-	   controlPoint1:CGPointMake(cx + 75.0, 66.0)
-	   controlPoint2:CGPointMake(cx + 68.0, 63.0)];
-	[tip closePath];
-	[tip applyTransform:t];
-	[paths addObject:tip];
+	// 中间横杠（长 126pt = 灵动岛长度，高 40pt，圆角 20）
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 63.0, 28.0, 126.0, 40.0)
+														cornerRadius:20.0];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
+
+	// 右端桃尖（大圆、圆心偏下：上缘与横杠齐平、下缘下垂，视觉为朝右下的桃尖）
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 50.0, 28.3, 52.0, 52.0)];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
 
 	return paths;
 }
