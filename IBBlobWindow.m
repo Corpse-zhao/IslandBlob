@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.1.8";
+static NSString * const kIBVersion = @"0.1.9";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -95,30 +95,33 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 27.0, 140.0, 35.0)
 											 cornerRadius:17.5]];
 
-	// 右端桃形头：单一平滑心形路径（六段三次贝塞尔，经典心形旋转 90° 朝右），
-	// 轮廓全程连续无拼接。0.1.8 起整体等比缩到 92%（中心不动）：64×68pt，尖 cx+99。
+	// 右端桃形头：单一平滑心形路径（六段三次贝塞尔，经典心形旋转 90° 朝右）。
+	// 0.1.9：两条曲线不再直接相交成尖角，改为在 ±35° 处接入 r9.2 圆帽，
+	// 可见尖端是一段纯圆弧（用户要求"不要太尖、圆润一点点"）。头宽仍 ≈64pt。
 	UIBezierPath *heart = [UIBezierPath bezierPath];
-	[heart moveToPoint:CGPointMake(cx + 99.2, 47.0)];                        // 桃尖（朝右）
-	[heart addCurveToPoint:CGPointMake(cx + 55.1, 80.9)                      // 下瓣底
-	   controlPoint1:CGPointMake(cx + 82.3, 67.4)
-	   controlPoint2:CGPointMake(cx + 68.7, 80.9)];
-	[heart addCurveToPoint:CGPointMake(cx + 34.8, 57.3)                      // 下瓣左侧
-	   controlPoint1:CGPointMake(cx + 40.2, 80.9)
-	   controlPoint2:CGPointMake(cx + 34.8, 67.4)];
-	[heart addCurveToPoint:CGPointMake(cx + 47.0, 47.0)                      // 中腰凹口（切线连续）
-	   controlPoint1:CGPointMake(cx + 34.8, 51.8)
-	   controlPoint2:CGPointMake(cx + 40.2, 47.0)];
-	[heart addCurveToPoint:CGPointMake(cx + 34.8, 36.9)                      // 上瓣左侧
-	   controlPoint1:CGPointMake(cx + 40.2, 47.0)
-	   controlPoint2:CGPointMake(cx + 34.8, 42.3)];
+	[heart moveToPoint:CGPointMake(cx + 97.5, 41.7)];                        // 上缘进圆帽处
 	[heart addCurveToPoint:CGPointMake(cx + 55.1, 13.1)                      // 上瓣顶
-	   controlPoint1:CGPointMake(cx + 34.8, 26.7)
-	   controlPoint2:CGPointMake(cx + 40.2, 13.1)];
-	[heart addCurveToPoint:CGPointMake(cx + 99.2, 47.0)                      // 收回桃尖
-	   controlPoint1:CGPointMake(cx + 68.7, 13.1)
-	   controlPoint2:CGPointMake(cx + 82.3, 26.7)];
-	[heart closePath];
+	   controlPoint1:CGPointMake(cx + 85.0, 27.5)
+	   controlPoint2:CGPointMake(cx + 68.7, 13.1)];
+	[heart addCurveToPoint:CGPointMake(cx + 34.8, 36.9)                      // 上瓣左侧
+	   controlPoint1:CGPointMake(cx + 40.2, 13.1)
+	   controlPoint2:CGPointMake(cx + 34.8, 26.7)];
+	[heart addCurveToPoint:CGPointMake(cx + 47.0, 47.0)                      // 中腰凹口（切线连续）
+	   controlPoint1:CGPointMake(cx + 34.8, 42.3)
+	   controlPoint2:CGPointMake(cx + 40.2, 47.0)];
+	[heart addCurveToPoint:CGPointMake(cx + 34.8, 57.3)                      // 下瓣左侧
+	   controlPoint1:CGPointMake(cx + 40.2, 47.0)
+	   controlPoint2:CGPointMake(cx + 34.8, 51.8)];
+	[heart addCurveToPoint:CGPointMake(cx + 55.1, 80.9)                      // 下瓣底
+	   controlPoint1:CGPointMake(cx + 34.8, 67.4)
+	   controlPoint2:CGPointMake(cx + 40.2, 80.9)];
+	[heart addCurveToPoint:CGPointMake(cx + 97.5, 52.3)                      // 下缘进圆帽处
+	   controlPoint1:CGPointMake(cx + 68.7, 80.9)
+	   controlPoint2:CGPointMake(cx + 83.0, 68.0)];
+	[heart closePath];                                                       // 收口弦藏在圆帽内
 	[p appendPath:heart];
+	// 尖端圆帽：右缘 = 一段纯圆弧（圆心 cx+90,47，r9.2，最右 cx+99.2 与 0.1.8 持平）
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 80.8, 37.8, 18.4, 18.4)]];
 
 	return p;
 }
