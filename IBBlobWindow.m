@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.4.5";
+static NSString * const kIBVersion = @"0.4.6";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -184,25 +184,26 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloa
 		[paths addObject:path];
 	}
 
-	// 右端"桃屁股"：单一路径（两瓣融合 + 右缘中浅凹口），上下各凸出横杠 5pt，
-	// 最右凸出横杠右缘约 30pt；起止点藏在横杠内部，衔接无缝
-	UIBezierPath *butt = [UIBezierPath bezierPath];
-	[butt moveToPoint:CGPointMake(cx + 55.0, 28.0)];                         // 起点（藏于横杠内）
-	[butt addCurveToPoint:CGPointMake(cx + 76.0, 22.0)                      // 上瓣顶
-	   controlPoint1:CGPointMake(cx + 62.0, 28.0)
-	   controlPoint2:CGPointMake(cx + 64.0, 22.0)];
-	[butt addCurveToPoint:CGPointMake(cx + 88.0, 44.5)                      // 右缘中凹点
-	   controlPoint1:CGPointMake(cx + 86.0, 22.0)
-	   controlPoint2:CGPointMake(cx + 94.0, 36.0)];
-	[butt addCurveToPoint:CGPointMake(cx + 76.0, 67.0)                      // 下瓣底
-	   controlPoint1:CGPointMake(cx + 94.0, 53.0)
-	   controlPoint2:CGPointMake(cx + 86.0, 67.0)];
-	[butt addCurveToPoint:CGPointMake(cx + 55.0, 61.0)                      // 回到横杠内
-	   controlPoint1:CGPointMake(cx + 64.0, 67.0)
-	   controlPoint2:CGPointMake(cx + 62.0, 61.0)];
-	[butt closePath];
-	[butt applyTransform:t];
-	[paths addObject:butt];
+	// 右端"桃尖"：朝右收窄的单一体（不是屁股双瓣），最右端略带弧度收钝
+	//   上下缘从横杠内 (cx+58, 27/63) 平滑外扩，到 (cx+83, 24/66) 后向内收，
+	//   尖端 (cx+98, 45) 用一段贝塞尔过渡，形成圆润的锐角
+	UIBezierPath *tip = [UIBezierPath bezierPath];
+	[tip moveToPoint:CGPointMake(cx + 58.0, 27.0)];                          // 起点（藏于横杠内）
+	[tip addCurveToPoint:CGPointMake(cx + 83.0, 24.0)                        // 上缘外扩至最宽处
+	   controlPoint1:CGPointMake(cx + 68.0, 27.0)
+	   controlPoint2:CGPointMake(cx + 75.0, 24.0)];
+	[tip addCurveToPoint:CGPointMake(cx + 98.0, 45.0)                        // 收到尖端（圆润）
+	   controlPoint1:CGPointMake(cx + 92.0, 24.0)
+	   controlPoint2:CGPointMake(cx + 98.0, 36.0)];
+	[tip addCurveToPoint:CGPointMake(cx + 83.0, 66.0)                        // 尖端转下缘
+	   controlPoint1:CGPointMake(cx + 98.0, 54.0)
+	   controlPoint2:CGPointMake(cx + 92.0, 66.0)];
+	[tip addCurveToPoint:CGPointMake(cx + 58.0, 63.0)                        // 下缘回到横杠内
+	   controlPoint1:CGPointMake(cx + 75.0, 66.0)
+	   controlPoint2:CGPointMake(cx + 68.0, 63.0)];
+	[tip closePath];
+	[tip applyTransform:t];
+	[paths addObject:tip];
 
 	return paths;
 }
