@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.1.4";
+static NSString * const kIBVersion = @"0.1.5";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -76,14 +76,13 @@ static UIWindow *IBKeyWindow(void)
 	return nil;
 }
 
-#pragma mark - 团块路径（1:1 仿用户特写图：左双球 + 粗横杠 + 右大圆头）
+#pragma mark - 团块路径（1:1 仿用户特写图：左双球 + 粗横杠 + 右端桃形头）
 //
-// 按特写图量出的比例（总宽:总高 ≈ 189:62 pt，图 344×115px → s≈0.633 pt/px）：
+// 按特写图量出的比例（总宽 ≈ 182pt，总高 ≈ 62pt）：
 //   · 左端：上下两枚 d40 圆球竖向交叠成"爱心瓣"，比横杠略微探出左缘
 //   · 中间：一根 140×35 的粗横杠
-//   · 右端：一枚 d54 大圆头，上下都凸出横杠一截，最右缘收圆
-// 整团相对灵动岛垂直居中：真实岛 y11..48（中心 29.5），团块 y14..76（中心 45，略沉一点，
-// 与原图一致 —— 原图团块底部明显比岛低）。
+//   · 右端：桃形头 —— 两枚 d28 圆瓣上下交叠（中腰有凹口）+ 一片收尖的花瓣楔形，
+//           尖朝右、上下都比横杠凸出，尖端圆钝（quad 曲线收口）
 static UIBezierPath *IBBlobPath(CGFloat width)
 {
 	CGFloat cx = width / 2.0;
@@ -95,8 +94,17 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 	// 中间粗横杠
 	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 27.0, 140.0, 35.0)
 											 cornerRadius:17.5]];
-	// 右端大圆头
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 40.0, 20.0, 54.0, 54.0)]];
+
+	// 右端桃形头：上下两枚圆瓣
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 44.0, 20.0, 28.0, 28.0)]];
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 44.0, 46.0, 28.0, 28.0)]];
+	// 花瓣楔形（尖朝右，收口圆钝）
+	UIBezierPath *wedge = [UIBezierPath bezierPath];
+	[wedge moveToPoint:CGPointMake(cx + 50.0, 26.0)];
+	[wedge addQuadCurveToPoint:CGPointMake(cx + 87.0, 47.0) controlPoint:CGPointMake(cx + 80.0, 32.0)];
+	[wedge addQuadCurveToPoint:CGPointMake(cx + 50.0, 68.0) controlPoint:CGPointMake(cx + 80.0, 62.0)];
+	[wedge closePath];
+	[p appendPath:wedge];
 
 	return p;
 }
