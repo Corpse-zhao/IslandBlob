@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.4.4";
+static NSString * const kIBVersion = @"0.4.5";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -146,14 +146,13 @@ static UIWindow *IBKeyWindow(void)
 //    appendPath 进同一条路径后 nonzero 规则会把重叠区填成透明洞。
 //    0.2.0 起每块形状单独一个 CAShapeLayer，黑上叠黑，永不露底。
 //
-// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.4 按用户参考图 1:1 复刻（像素级测量换算）：
-//   参考图 430×155，团块 423×149；横杠高 82~83px、厚薄一致，整体长宽比 2.84
-//   以横杠高 35pt 为基准等比换算（k = 35/82 ≈ 0.427）：
-//   · 横杠 y27..62（沿用 0.1.9 纵向位置）：长 107pt，圆角 = 高/2
+// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.5：
+//   · 横杠 y27..62，长 126pt = 与灵动岛本体等长（用户要求"跟灵动岛一样长"），圆角 = 高/2
 //   · 左上瓣 d48：圆心高于横杠中线 6.7pt，探出横杠上缘、压住横杠左端
-//   · 左下瓣 d40：比上瓣小一号，圆心低于中线 11.7pt，垂在横杠下方
-//   · 右端圆头 d47：与横杠同粗，圆心在横杠右端内侧，向右凸出成半圆帽
-//   参考图整体有 ~3.8° 右倾（翻拍角度），实机不加旋转，保持水平
+//   · 左下瓣 d40：小一号，圆心低于中线 11.7pt，垂在横杠下方
+//   · 右端"桃屁股"：**不是圆球**。两瓣（上下各一元）横向错开、中间留内凹缺口，
+//     右缘形成"瓣-凹-瓣"的桃子屁股轮廓（心形旋转 90° 朝右的下半）
+//   参考图 430×155 像素测量换算（k≈0.427），整体水平不旋转
 static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloat sy, CGFloat ox, CGFloat oy)
 {
 	CGFloat cx = width / 2.0;
@@ -166,31 +165,44 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloa
 
 	// 左上瓣（大，探出横杠上缘）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 91.3, 13.8, 48.0, 48.0)];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 100.0, 13.8, 48.0, 48.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
 	// 左下瓣（小一号，偏左下，垂在横杠下方）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 89.9, 36.2, 40.0, 40.0)];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 98.0, 36.2, 40.0, 40.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
 
-	// 中间横杠（长 107pt，高 35pt，圆角 17.5；覆盖灵动岛下半）
+	// 中间横杠（长 126pt = 灵动岛本体长度，圆角 17.5）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 53.5, 27.0, 107.0, 35.0)
+		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 63.0, 27.0, 126.0, 35.0)
 														cornerRadius:17.5];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
 
-	// 右端圆头（d47 ≈ 横杠同粗，向右凸出半圆帽）
-	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 38.5, 24.0, 47.0, 47.0)];
-		[path applyTransform:t];
-		[paths addObject:path];
-	}
+	// 右端"桃屁股"：单一路径（两瓣融合 + 右缘中浅凹口），上下各凸出横杠 5pt，
+	// 最右凸出横杠右缘约 30pt；起止点藏在横杠内部，衔接无缝
+	UIBezierPath *butt = [UIBezierPath bezierPath];
+	[butt moveToPoint:CGPointMake(cx + 55.0, 28.0)];                         // 起点（藏于横杠内）
+	[butt addCurveToPoint:CGPointMake(cx + 76.0, 22.0)                      // 上瓣顶
+	   controlPoint1:CGPointMake(cx + 62.0, 28.0)
+	   controlPoint2:CGPointMake(cx + 64.0, 22.0)];
+	[butt addCurveToPoint:CGPointMake(cx + 88.0, 44.5)                      // 右缘中凹点
+	   controlPoint1:CGPointMake(cx + 86.0, 22.0)
+	   controlPoint2:CGPointMake(cx + 94.0, 36.0)];
+	[butt addCurveToPoint:CGPointMake(cx + 76.0, 67.0)                      // 下瓣底
+	   controlPoint1:CGPointMake(cx + 94.0, 53.0)
+	   controlPoint2:CGPointMake(cx + 86.0, 67.0)];
+	[butt addCurveToPoint:CGPointMake(cx + 55.0, 61.0)                      // 回到横杠内
+	   controlPoint1:CGPointMake(cx + 64.0, 67.0)
+	   controlPoint2:CGPointMake(cx + 62.0, 61.0)];
+	[butt closePath];
+	[butt applyTransform:t];
+	[paths addObject:butt];
 
 	return paths;
 }
