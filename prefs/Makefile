@@ -1,3 +1,5 @@
+include $(THEOS)/makefiles/common.mk
+
 BUNDLE_NAME = IslandBlobPrefs
 IslandBlobPrefs_FILES = IBRootListController.m
 IslandBlobPrefs_INSTALL_PATH = /Library/PreferenceBundles
