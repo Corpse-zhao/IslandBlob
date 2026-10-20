@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>灵动岛团块</string>
+			<key>footerText</key>
+			<string>开启后灵动岛区域会渲染成一块撑大的黑色不规则团块（仿图效果），全程常驻显示。开关改动后约 0.5 秒自动生效，无需注销。</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>启用效果</string>
+			<key>key</key>
+			<string>enabled</string>
+			<key>default</key>
+			<true/>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,123 @@
+name: Build package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos (roothide branch)
+        run: |
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          ls "$HOME/theos" | head -20
+
+      - name: Setup iPhoneOS SDK
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/theos/sdks.git "$HOME/sdks-tmp"
+          cd "$HOME/sdks-tmp"
+          git sparse-checkout set iPhoneOS14.5.sdk
+          mkdir -p "$HOME/theos/sdks"
+          mv iPhoneOS14.5.sdk "$HOME/theos/sdks/"
+          cd "$HOME"
+          rm -rf "$HOME/sdks-tmp"
+          ls "$HOME/theos/sdks/"
+
+      - name: Install toolchain deps
+        run: brew install make xz ldid
+
+      - name: Preflight (static checks)
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys, plistlib
+
+          fail = 0
+
+          def bad(msg):
+              global fail
+              print("BAD:", msg)
+              fail = 1
+
+          for path in glob.glob("*.m") + glob.glob("*.h") + glob.glob("*.x") + glob.glob("prefs/*.m") + glob.glob("prefs/*.h"):
+              text = open(path, encoding="utf-8").read()
+              code = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+              code = re.sub(r"//[^\n]*", "", code)
+              code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+              for op, cl in (("{", "}"), ("(", ")"), ("[", "]")):
+                  if code.count(op) != code.count(cl):
+                      bad("%s 括号不平衡: %s=%d %s=%d" % (path, op, code.count(op), cl, code.count(cl)))
+              if "\r\n" in text:
+                  bad("%s 含 CRLF 行尾" % path)
+
+          for path in ["IslandBlob.plist", "prefs/Resources/Root.plist",
+                       "prefs/Resources/Info.plist",
+                       "layout/Library/PreferenceLoader/Preferences/IslandBlob.plist"]:
+              try:
+                  plistlib.load(open(path, "rb"))
+              except Exception as e:
+                  bad("%s plist 解析失败: %s" % (path, e))
+
+          tweak = open("Tweak.x", encoding="utf-8").read()
+          if "%ctor" not in tweak:
+              bad("Tweak.x 缺少 %ctor")
+          if "%hook" in tweak:
+              bad("Tweak.x 出现了 %hook（本工程不依赖任何 hook）")
+
+          mgr = open("IBBlobWindow.m", encoding="utf-8").read()
+          mgr_code = re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", mgr, flags=re.S))
+          if "makeKeyAndVisible" in mgr_code:
+              bad("IBBlobWindow.m 出现 makeKeyAndVisible（会抢走系统 key window）")
+          if "userInteractionEnabled = NO" not in mgr_code:
+              bad("IBBlobWindow.m 未关闭团块窗口的触摸")
+
+          ctrl = open("prefs/IBRootListController.h", encoding="utf-8").read()
+          m = re.search(r"@interface\s+PSListController\b[^{]*\{(.*?)\}", ctrl, re.S)
+          if not m or not re.search(r"(?<![\w])_specifiers(?![\w])", m.group(1)):
+              bad("prefs/IBRootListController.h 的 PSListController ivar 块里缺少 _specifiers")
+
+          entry = open("layout/Library/PreferenceLoader/Preferences/IslandBlob.plist", encoding="utf-8").read()
+          if "<key>entry</key>" not in entry:
+              bad("PreferenceLoader 入口 plist 缺少 entry 包裹")
+
+          ctrl_m = open("prefs/IBRootListController.m", encoding="utf-8").read()
+          if "IBWriteEnabled" not in ctrl_m or "IBReadEnabled" not in ctrl_m:
+              bad("prefs 面板缺少开关读写实现")
+
+          print("preflight fail =", fail)
+          sys.exit(fail)
+          PY
+
+      - name: Build package
+        run: |
+          export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"
+          gmake package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1
+          echo "---- packages ----"
+          ls -la packages/
+
+      - name: Verify package
+        run: |
+          python3 - <<'PY'
+          import glob, sys
+          debs = sorted(glob.glob("packages/*.deb"))
+          if not debs:
+              print("NO DEB PRODUCED"); sys.exit(1)
+          ok = True
+          for d in debs:
+              print("deb:", d)
+              if "iphoneos-arm64e" not in d:
+                  print("BAD: 文件名不是 iphoneos-arm64e 后缀（roothide 需要）")
+                  ok = False
+          sys.exit(0 if ok else 1)
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IslandBlob-deb
+          path: packages/*.deb
