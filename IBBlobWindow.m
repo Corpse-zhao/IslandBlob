@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.1.5";
+static NSString * const kIBVersion = @"0.1.6";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -95,16 +95,18 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 27.0, 140.0, 35.0)
 											 cornerRadius:17.5]];
 
-	// 右端桃形头：上下两枚圆瓣
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 44.0, 20.0, 28.0, 28.0)]];
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 44.0, 46.0, 28.0, 28.0)]];
-	// 花瓣楔形（尖朝右，收口圆钝）
+	// 右端桃形头（按用户第二张特写：肥桃心）—— 两枚 d48 肥圆瓣，左中腰留浅凹口
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 32.0, 9.0, 48.0, 48.0)]];
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 32.0, 37.0, 48.0, 48.0)]];
+	// 宽花瓣楔形（尖朝右）
 	UIBezierPath *wedge = [UIBezierPath bezierPath];
-	[wedge moveToPoint:CGPointMake(cx + 50.0, 26.0)];
-	[wedge addQuadCurveToPoint:CGPointMake(cx + 87.0, 47.0) controlPoint:CGPointMake(cx + 80.0, 32.0)];
-	[wedge addQuadCurveToPoint:CGPointMake(cx + 50.0, 68.0) controlPoint:CGPointMake(cx + 80.0, 62.0)];
+	[wedge moveToPoint:CGPointMake(cx + 40.0, 22.0)];
+	[wedge addQuadCurveToPoint:CGPointMake(cx + 100.0, 47.0) controlPoint:CGPointMake(cx + 94.0, 28.0)];
+	[wedge addQuadCurveToPoint:CGPointMake(cx + 40.0, 72.0) controlPoint:CGPointMake(cx + 94.0, 66.0)];
 	[wedge closePath];
 	[p appendPath:wedge];
+	// 尖端圆帽 r14：右缘是一段大圆弧，桃尖圆钝（用户要求"圆润"）
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 74.0, 33.0, 28.0, 28.0)]];
 
 	return p;
 }
