@@ -7,6 +7,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = IslandBlob
 IslandBlob_FILES = Tweak.x IBBlobWindow.m
 IslandBlob_FRAMEWORKS = UIKit Foundation
+IslandBlob_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
