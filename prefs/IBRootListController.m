@@ -38,6 +38,19 @@ static void IBWriteLog(NSString *message)
 	return _specifiers;
 }
 
+- (void)resetDefaults:(PSSpecifier *)specifier
+{
+	NSUserDefaults *defs = [[NSUserDefaults alloc] initWithSuiteName:@"com.corpse.islandblob"];
+	// 0.4.2 起只有等比大小 + 两个偏移；顺带清掉 0.4.x 遗留的拉伸参数，避免旧值残留
+	[defs setDouble:1.0 forKey:@"sizeScale"];
+	[defs setDouble:0.0 forKey:@"offsetX"];
+	[defs setDouble:0.0 forKey:@"offsetY"];
+	[defs removeObjectForKey:@"lengthScale"];
+	[defs removeObjectForKey:@"widthScale"];
+	IBWriteLog(@"已恢复默认：等比大小 1.0 / 偏移 0（已清除废弃的拉伸参数）");
+	[self reloadSpecifiers];
+}
+
 - (void)viewDidLoad
 {
 	[super viewDidLoad];
