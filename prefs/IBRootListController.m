@@ -48,9 +48,17 @@ static void IBWriteEnabled(BOOL on)
 
 @implementation IBRootListController
 
+- (void)viewDidLoad
+{
+	[super viewDidLoad];
+	IBWriteLog([NSString stringWithFormat:@"面板已加载：title=%@（设置进程能看到本行 = 入口正常）",
+				self.title ?: self.navigationItem.title ?: @"(nil)"]);
+}
+
 - (id)readPreferenceValue:(PSSpecifier *)specifier
 {
 	NSString *key = [specifier propertyForKey:@"key"];
+	IBWriteLog([NSString stringWithFormat:@"读取开关 %@ = %@", key ?: @"(nil)", IBReadEnabled() ? @"开" : @"关"]);
 	if ([key isEqualToString:@"enabled"]) {
 		return @(IBReadEnabled());
 	}

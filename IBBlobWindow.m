@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.1.2";
+static NSString * const kIBVersion = @"0.1.3";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -76,23 +76,30 @@ static UIWindow *IBKeyWindow(void)
 	return nil;
 }
 
-#pragma mark - 团块路径（仿图：胶囊撑大 + 多枚圆凸）
-
+#pragma mark - 团块路径（1:1 仿原图：爪印轮廓 —— 左拇指胶囊 + 大头圆 + 右侧两级台阶圆 + 宽底座）
+//
+// 坐标均为 pt，x 相对屏幕中心 cx，y 相对屏幕顶。轮廓要点（对照原图量出来的）：
+//   · 底座：比灵动岛更宽更厚的胶囊，y 20..60（真实岛是 y11..48）
+//   · 左上"拇指"小胶囊：顶端只比大脑袋低 ~6pt，横向探出底座左缘
+//   · 大脑袋圆：整团最高点，圆心偏左（cx-21），直径最大
+//   · 右侧两枚台阶圆：逐级变小、逐级变低，形成爪印"脚趾"的阶梯感
 static UIBezierPath *IBBlobPath(CGFloat width)
 {
 	CGFloat cx = width / 2.0;
 	UIBezierPath *p = [UIBezierPath bezierPath];
 
-	// 主体：放大版胶囊
-	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 73.0, 26.0, 146.0, 40.0)
+	// 底座胶囊
+	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 95.0, 20.0, 185.0, 40.0)
 											 cornerRadius:20.0]];
-	// 顶部三枚圆凸（中间最大）
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 56.0, 20.0, 32.0, 32.0)]];
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 20.0, 8.0, 40.0, 40.0)]];
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 24.0, 20.0, 32.0, 32.0)]];
-	// 两侧小凸，让轮廓更"爪印"一点
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 84.0, 36.0, 20.0, 20.0)]];
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 64.0, 36.0, 20.0, 20.0)]];
+	// 左上拇指小胶囊
+	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 100.0, 8.0, 44.0, 30.0)
+											 cornerRadius:15.0]];
+	// 大脑袋圆（最高点，偏左）
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 44.0, 2.0, 46.0, 46.0)]];
+	// 右上中圆
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 8.0, 10.0, 36.0, 36.0)]];
+	// 右侧台阶小圆
+	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 48.0, 18.0, 26.0, 26.0)]];
 
 	return p;
 }
