@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.1.9";
+static NSString * const kIBVersion = @"0.2.0";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -76,28 +76,30 @@ static UIWindow *IBKeyWindow(void)
 	return nil;
 }
 
-#pragma mark - 团块路径（1:1 仿用户特写图：左双球 + 粗横杠 + 右端桃形头）
+#pragma mark - 团块子路径（每块独立一层，杜绝 nonzero 绕向相反导致的"挖空"）
 //
-// 按特写图量出的比例（总宽 ≈ 182pt，总高 ≈ 62pt）：
-//   · 左端：上下两枚 d40 圆球竖向交叠成"爱心瓣"，比横杠略微探出左缘
-//   · 中间：一根 140×35 的粗横杠
-//   · 右端：桃形头 —— 两枚 d28 圆瓣上下交叠（中腰有凹口）+ 一片收尖的花瓣楔形，
-//           尖朝右、上下都比横杠凸出，尖端圆钝（quad 曲线收口）
-static UIBezierPath *IBBlobPath(CGFloat width)
+// ⚠️ 0.1.x 的教训：椭圆子路径与圆角矩形/手绘贝塞尔的绕向相反，
+//    appendPath 进同一条路径后 nonzero 规则会把重叠区填成透明洞。
+//    0.2.0 起每块形状单独一个 CAShapeLayer，黑上叠黑，永不露底。
+//
+// 几何（pt，y 相对屏幕顶）：
+//   · 横杠 y10..52：完整盖住灵动岛（y11..48），比 0.1.x 上移加高
+//   · 左端双球 d40：y14/36，探出横杠左缘
+//   · 右端桃形头：平滑心形（六段三次贝塞尔）+ r9.2 圆帽钝尖
+static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 {
 	CGFloat cx = width / 2.0;
-	UIBezierPath *p = [UIBezierPath bezierPath];
+	NSMutableArray<UIBezierPath *> *paths = [NSMutableArray array];
 
 	// 左端双球（爱心瓣）
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 14.0, 40.0, 40.0)]];
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 36.0, 40.0, 40.0)]];
-	// 中间粗横杠
-	[p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 27.0, 140.0, 35.0)
-											 cornerRadius:17.5]];
+	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 14.0, 40.0, 40.0)]];
+	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 36.0, 40.0, 40.0)]];
 
-	// 右端桃形头：单一平滑心形路径（六段三次贝塞尔，经典心形旋转 90° 朝右）。
-	// 0.1.9：两条曲线不再直接相交成尖角，改为在 ±35° 处接入 r9.2 圆帽，
-	// 可见尖端是一段纯圆弧（用户要求"不要太尖、圆润一点点"）。头宽仍 ≈64pt。
+	// 中间粗横杠（上移加高，完整覆盖灵动岛）
+	[paths addObject:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 10.0, 140.0, 42.0)
+												cornerRadius:21.0]];
+
+	// 右端桃形头：平滑心形
 	UIBezierPath *heart = [UIBezierPath bezierPath];
 	[heart moveToPoint:CGPointMake(cx + 97.5, 41.7)];                        // 上缘进圆帽处
 	[heart addCurveToPoint:CGPointMake(cx + 55.1, 13.1)                      // 上瓣顶
@@ -118,12 +120,13 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 	[heart addCurveToPoint:CGPointMake(cx + 97.5, 52.3)                      // 下缘进圆帽处
 	   controlPoint1:CGPointMake(cx + 68.7, 80.9)
 	   controlPoint2:CGPointMake(cx + 83.0, 68.0)];
-	[heart closePath];                                                       // 收口弦藏在圆帽内
-	[p appendPath:heart];
-	// 尖端圆帽：右缘 = 一段纯圆弧（圆心 cx+90,47，r9.2，最右 cx+99.2 与 0.1.8 持平）
-	[p appendPath:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 80.8, 37.8, 18.4, 18.4)]];
+	[heart closePath];
+	[paths addObject:heart];
 
-	return p;
+	// 尖端圆帽（右缘 = 纯圆弧）
+	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 80.8, 37.8, 18.4, 18.4)]];
+
+	return paths;
 }
 
 #pragma mark - 团块视图
@@ -140,13 +143,6 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 		self.userInteractionEnabled = NO;
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
-
-		CAShapeLayer *shape = [CAShapeLayer layer];
-		shape.fillColor = [UIColor blackColor].CGColor;
-		shape.strokeColor = nil;
-		shape.frame = self.bounds;
-		shape.path = IBBlobPath(self.bounds.size.width).CGPath;
-		[self.layer addSublayer:shape];
 	}
 	return self;
 }
@@ -155,10 +151,20 @@ static UIBezierPath *IBBlobPath(CGFloat width)
 {
 	[super layoutSubviews];
 
-	CAShapeLayer *shape = (CAShapeLayer *)self.layer.sublayers.firstObject;
-	if (![shape isKindOfClass:[CAShapeLayer class]]) return;
-	shape.frame = self.bounds;
-	shape.path = IBBlobPath(self.bounds.size.width).CGPath;
+	if (self.bounds.size.width < 1.0) return;
+
+	// 每块形状独立 CAShapeLayer：黑上叠黑，绕向差异再也挖不出透明洞
+	for (CALayer *old in self.layer.sublayers) {
+		[old removeFromSuperlayer];
+	}
+	for (UIBezierPath *path in IBBlobSubPaths(self.bounds.size.width)) {
+		CAShapeLayer *shape = [CAShapeLayer layer];
+		shape.fillColor = [UIColor blackColor].CGColor;
+		shape.strokeColor = nil;
+		shape.frame = self.bounds;
+		shape.path = path.CGPath;
+		[self.layer addSublayer:shape];
+	}
 }
 
 @end

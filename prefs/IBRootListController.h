@@ -14,6 +14,7 @@
 - (void)setPreferenceValue:(id)value specifier:(PSSpecifier *)specifier;
 - (id)readPreferenceValue:(PSSpecifier *)specifier;
 - (UITableView *)table;
+- (NSArray *)specifiers;
 @end
 
 @interface IBRootListController : PSListController

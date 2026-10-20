@@ -48,6 +48,17 @@ static void IBWriteEnabled(BOOL on)
 
 @implementation IBRootListController
 
+// 显式加载 Root.plist：不依赖基类默认实现（部分 iOS 16 上默认路径拿不到 plist → 整页空白）
+- (NSArray *)specifiers
+{
+	if (!_specifiers) {
+		_specifiers = [self loadSpecifiersFromPlistName:@"Root" target:self];
+		IBWriteLog([NSString stringWithFormat:@"Root.plist 加载：%lu 条 specifier",
+					(unsigned long)_specifiers.count]);
+	}
+	return _specifiers;
+}
+
 - (void)viewDidLoad
 {
 	[super viewDidLoad];
