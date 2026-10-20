@@ -10,6 +10,8 @@
 		<string>PSLinkCell</string>
 		<key>detail</key>
 		<string>IBRootListController</string>
+		<key>icon</key>
+		<string>/Library/PreferenceBundles/IslandBlobPrefs.bundle/icon.png</string>
 		<key>isController</key>
 		<true/>
 		<key>label</key>
