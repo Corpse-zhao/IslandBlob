@@ -158,9 +158,6 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 
 #pragma mark - 团块视图
 
-@interface IBBlobView : UIView
-@end
-
 @interface IBBlobView : UIView {
 	CGFloat _builtWidth;
 }

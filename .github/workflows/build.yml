@@ -69,6 +69,15 @@ jobs:
           if "%hook" in tweak:
               bad("Tweak.x 出现了 %hook（本工程不依赖任何 hook）")
 
+          # 重复 @interface / @implementation：同名类只能有一处接口定义（0.2.1 曾因此编译失败）
+          for path in glob.glob("*.m") + glob.glob("prefs/*.m"):
+              src = open(path, encoding="utf-8").read()
+              for kind in ("interface", "implementation"):
+                  names = re.findall(r"@%s\s+(\w+)" % kind, src)
+                  dup = sorted({n for n in names if names.count(n) > 1})
+                  if dup:
+                      bad("%s 重复 @%s: %s" % (path, kind, ",".join(dup)))
+
           mgr = open("IBBlobWindow.m", encoding="utf-8").read()
           mgr_code = re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", mgr, flags=re.S))
           if "makeKeyAndVisible" in mgr_code:
