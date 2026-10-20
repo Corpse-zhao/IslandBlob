@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.2.0";
+static NSString * const kIBVersion = @"0.2.1";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -49,6 +49,33 @@ static BOOL IBReadEnabled(void)
 	if (!d) return YES;                 // 未配置 => 默认开启
 	id v = d[@"enabled"];
 	return v ? [v boolValue] : YES;
+}
+
+#pragma mark - 启动崩溃熔断
+//
+// 插件一旦在 SpringBoard 里崩，系统会进安全模式；若每次重载都崩，用户会被锁在安全模式里反复折腾。
+// 这里做计数：20 秒内重复启动视为"上次崩溃了"，累计 3 次就不再挂载（仅写日志），
+// 保证手机一定能用；用户删包/注销后计数文件（startup.plist）会被清掉自然恢复。
+static BOOL IBCrashGuardAllowsStart(void)
+{
+	NSString *path = [kIBPrefDir stringByAppendingPathComponent:@"startup.plist"];
+	NSDictionary *prev = [NSDictionary dictionaryWithContentsOfFile:path];
+	double now = [NSDate date].timeIntervalSince1970;
+	double last = prev[@"last"] ? [prev[@"last"] doubleValue] : 0.0;
+	int count = prev[@"count"] ? [prev[@"count"] intValue] : 0;
+	count = (now - last < 20.0) ? (count + 1) : 1;
+
+	NSFileManager *fm = [NSFileManager defaultManager];
+	if (![fm fileExistsAtPath:kIBPrefDir]) {
+		[fm createDirectoryAtPath:kIBPrefDir withIntermediateDirectories:YES attributes:nil error:NULL];
+	}
+	[@{@"last": @(now), @"count": @(count)} writeToFile:path atomically:YES];
+
+	if (count >= 3) {
+		IBLog(@"[熔断] 20 秒内第 %d 次启动 → 判定上次崩溃，本次不挂载（手机可正常使用）", count);
+		return NO;
+	}
+	return YES;
 }
 
 #pragma mark - 窗口工具
@@ -134,6 +161,11 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 @interface IBBlobView : UIView
 @end
 
+@interface IBBlobView : UIView {
+	CGFloat _builtWidth;
+}
+@end
+
 @implementation IBBlobView
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -143,6 +175,7 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 		self.userInteractionEnabled = NO;
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
+		_builtWidth = 0.0;
 	}
 	return self;
 }
@@ -151,13 +184,20 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 {
 	[super layoutSubviews];
 
-	if (self.bounds.size.width < 1.0) return;
+	CGFloat width = self.bounds.size.width;
+	if (width < 1.0) return;
+	// 宽度没变就不重建：0.5s 一轮的守护循环会反复 setNeedsLayout，重建层没必要且易出事
+	if (_builtWidth > 0.0 && fabs(width - _builtWidth) < 0.5) return;
+	_builtWidth = width;
 
-	// 每块形状独立 CAShapeLayer：黑上叠黑，绕向差异再也挖不出透明洞
-	for (CALayer *old in self.layer.sublayers) {
+	// ⚠️ 必须先拷贝再删：直接遍历 self.layer.sublayers 同时 removeFromSuperlayer
+	//    会触发"集合在枚举中被修改"异常 → SpringBoard 崩溃 → 安全模式（0.2.0 实锤）
+	NSArray<CALayer *> *existing = [[self.layer sublayers] copy];
+	for (CALayer *old in existing) {
 		[old removeFromSuperlayer];
 	}
-	for (UIBezierPath *path in IBBlobSubPaths(self.bounds.size.width)) {
+
+	for (UIBezierPath *path in IBBlobSubPaths(width)) {
 		CAShapeLayer *shape = [CAShapeLayer layer];
 		shape.fillColor = [UIColor blackColor].CGColor;
 		shape.strokeColor = nil;
@@ -202,6 +242,10 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 	IBLog(@"========== IslandBlob %@ 启动（常驻 + 开关）==========", kIBVersion);
 	IBLog(@"[配置] 当前开关=%d（文件 %@）", IBReadEnabled() ? 1 : 0, kIBPrefPath);
 
+	if (!IBCrashGuardAllowsStart()) {
+		return;                     // 熔断：手机保持可用，日志里能看到原因
+	}
+
 	__weak typeof(self) weakSelf = self;
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
 				   dispatch_get_main_queue(), ^{
@@ -218,6 +262,16 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 }
 
 - (void)tick
+{
+	// tick 跑在 SpringBoard 主线程上，任何异常都会直接把桌面送进安全模式 —— 全部兜住
+	@try {
+		[self tickInside];
+	} @catch (NSException *e) {
+		IBLog(@"[异常] tick 抛出 %@: %@（已吞掉，避免安全模式）", e.name, e.reason);
+	}
+}
+
+- (void)tickInside
 {
 	BOOL on = IBReadEnabled();
 
@@ -259,12 +313,16 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 		if (bounds.size.width < 1.0) continue;
 
 		UIView *host = w.rootViewController.view;
-		host.frame = bounds;
+		if (!CGRectEqualToRect(host.frame, bounds)) {
+			host.frame = bounds;
+		}
 		IBBlobView *blob = (IBBlobView *)host.subviews.firstObject;
 		if (blob && ![blob isKindOfClass:[IBBlobView class]]) blob = nil;
 		if (blob) {
-			blob.frame = CGRectMake(0.0, 0.0, bounds.size.width, 96.0);
-			[blob setNeedsLayout];
+			CGRect wanted = CGRectMake(0.0, 0.0, bounds.size.width, 96.0);
+			if (!CGRectEqualToRect(blob.frame, wanted)) {
+				blob.frame = wanted;         // 尺寸真的变了才动，避免每轮无效布局
+			}
 		}
 	}
 
