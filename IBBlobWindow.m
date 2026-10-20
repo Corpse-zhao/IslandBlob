@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.3.1";
+static NSString * const kIBVersion = @"0.4.0";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -43,38 +43,44 @@ static void IBLog(NSString *fmt, ...)
 
 #pragma mark - 开关读取（被 prefs 面板写入的同一份文件）
 
+#pragma mark - 用户调节（CFPreferences 偏好域，与设置面板原生读写同一域）
+
+static CFStringRef const kIBDomain = CFSTR("com.corpse.islandblob");
+
 static BOOL IBReadEnabled(void)
 {
-	NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kIBPrefPath];
-	if (!d) return YES;                 // 未配置 => 默认开启
-	id v = d[@"enabled"];
-	return v ? [v boolValue] : YES;
+	CFPreferencesAppSynchronize(kIBDomain);
+	CFTypeRef v = CFPreferencesCopyAppValue(CFSTR("enabled"), kIBDomain);
+	BOOL on = YES;                      // 未配置 => 默认开启
+	if (v) {
+		on = [(__bridge NSNumber *)v boolValue];
+		CFRelease(v);
+	}
+	return on;
 }
 
-#pragma mark - 用户调节（面板滑条：长度 / 宽度 / 大小 / 左右 / 上下）
-
-static CGFloat IBConfigNumber(NSDictionary *d, NSString *key, CGFloat def)
+static CGFloat IBPrefNumber(NSString *key, CGFloat def, CGFloat min, CGFloat max)
 {
-	id v = d[key];
-	if (![v respondsToSelector:@selector(doubleValue)]) return def;
-	return (CGFloat)[v doubleValue];
+	CFPreferencesAppSynchronize(kIBDomain);
+	CFTypeRef v = CFPreferencesCopyAppValue((__bridge CFStringRef)key, kIBDomain);
+	CGFloat f = def;
+	if (v) {
+		f = (CGFloat)[(__bridge NSNumber *)v doubleValue];
+		CFRelease(v);
+	}
+	if (f < min) f = min;
+	if (f > max) f = max;
+	return f;
 }
 
 // 读取五项调节参数；全部做范围钳制，坏值一律回落默认
 static void IBReadLook(CGFloat *sx, CGFloat *sy, CGFloat *ox, CGFloat *oy)
 {
-	NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kIBPrefPath];
-	CGFloat size = IBConfigNumber(d, @"sizeScale", 1.0);
-	CGFloat len  = IBConfigNumber(d, @"lengthScale", 1.0);
-	CGFloat wid  = IBConfigNumber(d, @"widthScale", 1.0);
-	CGFloat dx   = IBConfigNumber(d, @"offsetX", 0.0);
-	CGFloat dy   = IBConfigNumber(d, @"offsetY", 0.0);
-
-	if (size < 0.3) size = 0.3; if (size > 3.0) size = 3.0;
-	if (len  < 0.3) len  = 0.3; if (len  > 3.0) len  = 3.0;
-	if (wid  < 0.3) wid  = 0.3; if (wid  > 3.0) wid  = 3.0;
-	if (dx   < -200.0) dx = -200.0; if (dx > 200.0) dx = 200.0;
-	if (dy   < -120.0) dy = -120.0; if (dy > 120.0) dy = 120.0;
+	CGFloat size = IBPrefNumber(@"sizeScale", 1.0, 0.3, 3.0);
+	CGFloat len  = IBPrefNumber(@"lengthScale", 1.0, 0.3, 3.0);
+	CGFloat wid  = IBPrefNumber(@"widthScale", 1.0, 0.3, 3.0);
+	CGFloat dx   = IBPrefNumber(@"offsetX", 0.0, -200.0, 200.0);
+	CGFloat dy   = IBPrefNumber(@"offsetY", 0.0, -120.0, 120.0);
 
 	*sx = size * len;
 	*sy = size * wid;

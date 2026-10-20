@@ -1,6 +1,6 @@
 Package: com.corpse.islandblob
 Name: IslandBlob
-Version: 0.3.1
+Version: 0.4.0
 Architecture: iphoneos-arm
 Description: 灵动岛区域渲染成黑色不规则团块（仿图效果），常驻显示，设置内可开关。
 Maintainer: Corpse-zhao
