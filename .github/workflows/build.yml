@@ -95,8 +95,11 @@ jobs:
               bad("PreferenceLoader 入口 plist 缺少 entry 包裹")
 
           ctrl_m = open("prefs/IBRootListController.m", encoding="utf-8").read()
-          if "IBWriteEnabled" not in ctrl_m or "IBReadEnabled" not in ctrl_m:
-              bad("prefs 面板缺少开关读写实现")
+          if "loadSpecifiersFromPlistName" not in ctrl_m:
+              bad("prefs 面板缺显式 specifiers 加载")
+          for cell_key in ("PSSwitchCell", "PSSliderCell", "defaults"):
+              if cell_key not in open("prefs/Resources/Root.plist", encoding="utf-8").read():
+                  bad("Root.plist 缺少 " + cell_key)
 
           print("preflight fail =", fail)
           sys.exit(fail)
