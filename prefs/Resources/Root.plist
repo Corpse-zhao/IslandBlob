@@ -10,7 +10,7 @@
 			<key>label</key>
 			<string>灵动岛团块</string>
 			<key>footerText</key>
-			<string>开启后灵动岛区域会渲染成一块撑大的黑色不规则团块（仿图效果），全程常驻显示。开关改动后约 0.5 秒自动生效，无需注销。</string>
+			<string>开关与滑条改动约 0.5 秒自动生效，无需注销。调节建议：先把「左右 / 上下」归零，用「大小 / 长度 / 宽度」定形状，最后微调位置。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -21,6 +21,88 @@
 			<string>enabled</string>
 			<key>default</key>
 			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>大小与比例</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>整体大小</string>
+			<key>key</key>
+			<string>sizeScale</string>
+			<key>min</key>
+			<real>0.5</real>
+			<key>max</key>
+			<real>2</real>
+			<key>default</key>
+			<real>1</real>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>长度（横向拉伸）</string>
+			<key>key</key>
+			<string>lengthScale</string>
+			<key>min</key>
+			<real>0.5</real>
+			<key>max</key>
+			<real>2</real>
+			<key>default</key>
+			<real>1</real>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>宽度（纵向拉伸）</string>
+			<key>key</key>
+			<string>widthScale</string>
+			<key>min</key>
+			<real>0.5</real>
+			<key>max</key>
+			<real>2</real>
+			<key>default</key>
+			<real>1</real>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>位置微调</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>左右偏移</string>
+			<key>key</key>
+			<string>offsetX</string>
+			<key>min</key>
+			<real>-150</real>
+			<key>max</key>
+			<real>150</real>
+			<key>default</key>
+			<real>0</real>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>上下偏移</string>
+			<key>key</key>
+			<string>offsetY</string>
+			<key>min</key>
+			<real>-80</real>
+			<key>max</key>
+			<real>80</real>
+			<key>default</key>
+			<real>0</real>
 		</dict>
 	</array>
 </dict>

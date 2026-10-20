@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.2.1";
+static NSString * const kIBVersion = @"0.3.0";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -49,6 +49,37 @@ static BOOL IBReadEnabled(void)
 	if (!d) return YES;                 // 未配置 => 默认开启
 	id v = d[@"enabled"];
 	return v ? [v boolValue] : YES;
+}
+
+#pragma mark - 用户调节（面板滑条：长度 / 宽度 / 大小 / 左右 / 上下）
+
+static CGFloat IBConfigNumber(NSDictionary *d, NSString *key, CGFloat def)
+{
+	id v = d[key];
+	if (![v respondsToSelector:@selector(doubleValue)]) return def;
+	return (CGFloat)[v doubleValue];
+}
+
+// 读取五项调节参数；全部做范围钳制，坏值一律回落默认
+static void IBReadLook(CGFloat *sx, CGFloat *sy, CGFloat *ox, CGFloat *oy)
+{
+	NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kIBPrefPath];
+	CGFloat size = IBConfigNumber(d, @"sizeScale", 1.0);
+	CGFloat len  = IBConfigNumber(d, @"lengthScale", 1.0);
+	CGFloat wid  = IBConfigNumber(d, @"widthScale", 1.0);
+	CGFloat dx   = IBConfigNumber(d, @"offsetX", 0.0);
+	CGFloat dy   = IBConfigNumber(d, @"offsetY", 0.0);
+
+	if (size < 0.3) size = 0.3; if (size > 3.0) size = 3.0;
+	if (len  < 0.3) len  = 0.3; if (len  > 3.0) len  = 3.0;
+	if (wid  < 0.3) wid  = 0.3; if (wid  > 3.0) wid  = 3.0;
+	if (dx   < -200.0) dx = -200.0; if (dx > 200.0) dx = 200.0;
+	if (dy   < -120.0) dy = -120.0; if (dy > 120.0) dy = 120.0;
+
+	*sx = size * len;
+	*sy = size * wid;
+	*ox = dx;
+	*oy = dy;
 }
 
 #pragma mark - 启动崩溃熔断
@@ -113,18 +144,35 @@ static UIWindow *IBKeyWindow(void)
 //   · 横杠 y10..52：完整盖住灵动岛（y11..48），比 0.1.x 上移加高
 //   · 左端双球 d40：y14/36，探出横杠左缘
 //   · 右端桃形头：平滑心形（六段三次贝塞尔）+ r9.2 圆帽钝尖
-static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
+static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloat sy, CGFloat ox, CGFloat oy)
 {
 	CGFloat cx = width / 2.0;
 	NSMutableArray<UIBezierPath *> *paths = [NSMutableArray array];
 
-	// 左端双球（爱心瓣）
-	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 14.0, 40.0, 40.0)]];
-	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 36.0, 40.0, 40.0)]];
+	// 用户调节：以 (cx, 47) 为锚点（屏幕水平中心 + 形状纵向中心）做等比/异比缩放与平移
+	CGAffineTransform t = CGAffineTransformMakeTranslation(cx + ox, 47.0 + oy);
+	t = CGAffineTransformScale(t, sx, sy);
+	t = CGAffineTransformTranslate(t, -cx, -47.0);
 
-	// 中间粗横杠（上移加高，完整覆盖灵动岛）
-	[paths addObject:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 10.0, 140.0, 42.0)
-												cornerRadius:21.0]];
+	// 左端双球（爱心瓣）
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 14.0, 40.0, 40.0)];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 95.0, 36.0, 40.0, 40.0)];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
+
+	// 中间粗横杠（完整覆盖灵动岛）
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 88.0, 10.0, 140.0, 42.0)
+														cornerRadius:21.0];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
 
 	// 右端桃形头：平滑心形
 	UIBezierPath *heart = [UIBezierPath bezierPath];
@@ -148,10 +196,15 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 	   controlPoint1:CGPointMake(cx + 68.7, 80.9)
 	   controlPoint2:CGPointMake(cx + 83.0, 68.0)];
 	[heart closePath];
+	[heart applyTransform:t];
 	[paths addObject:heart];
 
 	// 尖端圆帽（右缘 = 纯圆弧）
-	[paths addObject:[UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 80.8, 37.8, 18.4, 18.4)]];
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 80.8, 37.8, 18.4, 18.4)];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
 
 	return paths;
 }
@@ -160,7 +213,15 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 
 @interface IBBlobView : UIView {
 	CGFloat _builtWidth;
+	CGFloat _builtSx;
+	CGFloat _builtSy;
+	CGFloat _builtOx;
+	CGFloat _builtOy;
 }
+@property (nonatomic, assign) CGFloat lookSx;
+@property (nonatomic, assign) CGFloat lookSy;
+@property (nonatomic, assign) CGFloat lookOx;
+@property (nonatomic, assign) CGFloat lookOy;
 @end
 
 @implementation IBBlobView
@@ -183,9 +244,15 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 
 	CGFloat width = self.bounds.size.width;
 	if (width < 1.0) return;
-	// 宽度没变就不重建：0.5s 一轮的守护循环会反复 setNeedsLayout，重建层没必要且易出事
-	if (_builtWidth > 0.0 && fabs(width - _builtWidth) < 0.5) return;
+	// 宽度或五项调节参数没变就不重建：避免每 0.5 秒反复毁建图层
+	if (_builtWidth > 0.0 && fabs(width - _builtWidth) < 0.5
+		&& fabs(self.lookSx - _builtSx) < 0.001 && fabs(self.lookSy - _builtSy) < 0.001
+		&& fabs(self.lookOx - _builtOx) < 0.01 && fabs(self.lookOy - _builtOy) < 0.01) return;
 	_builtWidth = width;
+	_builtSx = self.lookSx;
+	_builtSy = self.lookSy;
+	_builtOx = self.lookOx;
+	_builtOy = self.lookOy;
 
 	// ⚠️ 必须先拷贝再删：直接遍历 self.layer.sublayers 同时 removeFromSuperlayer
 	//    会触发"集合在枚举中被修改"异常 → SpringBoard 崩溃 → 安全模式（0.2.0 实锤）
@@ -194,7 +261,7 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 		[old removeFromSuperlayer];
 	}
 
-	for (UIBezierPath *path in IBBlobSubPaths(width)) {
+	for (UIBezierPath *path in IBBlobSubPaths(width, self.lookSx, self.lookSy, self.lookOx, self.lookOy)) {
 		CAShapeLayer *shape = [CAShapeLayer layer];
 		shape.fillColor = [UIColor blackColor].CGColor;
 		shape.strokeColor = nil;
@@ -319,6 +386,17 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width)
 			CGRect wanted = CGRectMake(0.0, 0.0, bounds.size.width, 96.0);
 			if (!CGRectEqualToRect(blob.frame, wanted)) {
 				blob.frame = wanted;         // 尺寸真的变了才动，避免每轮无效布局
+			}
+			// 用户调节参数：每轮读取、有变化才触发重建
+			CGFloat sx, sy, ox, oy;
+			IBReadLook(&sx, &sy, &ox, &oy);
+			if (fabs(blob.lookSx - sx) > 0.001 || fabs(blob.lookSy - sy) > 0.001
+				|| fabs(blob.lookOx - ox) > 0.01 || fabs(blob.lookOy - oy) > 0.01) {
+				blob.lookSx = sx;
+				blob.lookSy = sy;
+				blob.lookOx = ox;
+				blob.lookOy = oy;
+				[blob setNeedsLayout];
 			}
 		}
 	}
