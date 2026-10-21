@@ -1,7 +1,7 @@
 #import "IBBlobWindow.h"
 
 // 版本号唯一来源（日志 / 面板 / control 三处必须一致）
-static NSString * const kIBVersion = @"0.4.7";
+static NSString * const kIBVersion = @"0.4.8";
 
 static NSString * const kIBPrefDir  = @"/var/mobile/Documents/IslandBlob";
 static NSString * const kIBPrefPath = @"/var/mobile/Documents/IslandBlob/config.plist";
@@ -146,14 +146,16 @@ static UIWindow *IBKeyWindow(void)
 //    appendPath 进同一条路径后 nonzero 规则会把重叠区填成透明洞。
 //    0.2.0 起每块形状单独一个 CAShapeLayer，黑上叠黑，永不露底。
 //
-// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.7 按参考图重新拟合（阈值 60，analyze_ref2.py）：
-//   图 430×155：横条 242×78px（右倾 3.5° 为翻拍角度，实机水平）、左上瓣 d88、左下瓣 d94、
-//   右端 = d100 大圆且圆心低于横条中线 12px（上缘与横条齐平、下缘下垂 → 视觉为朝右下的桃尖）
-//   以横条长 = 灵动岛 126pt 定 k=0.521：
-//   · 横杠 (cx-63, 28, 126, 40) r20 —— 与岛等长
-//   · 左上瓣 d46：圆心 (cx-92.7, 27.7)，高于横杠中线 20.3pt
-//   · 左下瓣 d49：圆心 (cx-92.7, 56.9)，低于中线 8.9pt，两瓣间自然形成心形凹口
-//   · 右端桃尖：d52 圆，圆心 (cx+76, 54.3) —— 上缘与横杠齐平、下缘垂 12pt
+// 几何（pt，y 相对屏幕顶）—— ⭐ 0.4.8 按用户二发参考图逐列重测（analyze_ref3.py，阈值 100）：
+//   图 434×159：三瓣全部 d≈102px（一样大！），横杠粗 84px、两瓣圆心间距 314px（= 3.74×粗）；
+//   左双瓣圆心正好在横杠左端点上、上下排列（间距 47px，上瓣心高于中线 31.6、下瓣心低于中线 15.7）；
+//   右瓣圆心正好在横杠右端点上、低于中线 10px。
+//   ⚠️ 0.4.7 的错：三瓣不等大（46/49/52）且圆心探出横杠两端 13~15pt → 像"棍子上粘球"，不是骨头。
+//   以横杠长 = 灵动岛 126pt 定 k=0.4013（横杠粗 34pt、瓣 d41pt）：
+//   · 横杠 (cx-63, 28, 126, 34) r17 —— 与岛等长，左端点=左双瓣圆心，右端点=右瓣圆心
+//   · 左上瓣 d41：圆心 (cx-63, 32.3)，高于横杠中线 12.7pt
+//   · 左下瓣 d41：圆心 (cx-63, 51.3)，低于中线 6.3pt，两瓣左缘形成骨头凹口
+//   · 右端瓣 d41：圆心 (cx+63, 49.0)，上缘与横杠齐平、下缘垂 4pt
 static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloat sy, CGFloat ox, CGFloat oy)
 {
 	CGFloat cx = width / 2.0;
@@ -164,30 +166,30 @@ static NSArray<UIBezierPath *> *IBBlobSubPaths(CGFloat width, CGFloat sx, CGFloa
 	t = CGAffineTransformScale(t, sx, sy);
 	t = CGAffineTransformTranslate(t, -cx, -43.0);
 
-	// 左上瓣（心形上瓣；圆心比图测值右移 15pt 嵌入横杠，保证与横杠实连）
+	// 左上瓣（圆心 = 横杠左端点，高于横杠中线 12.7pt）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 100.7, 4.7, 46.0, 46.0)];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 83.5, 11.8, 41.0, 41.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
-	// 左下瓣（略大，心形下瓣）
+	// 左下瓣（与上瓣等大，圆心 = 横杠左端点，低于中线 6.3pt）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 102.2, 32.4, 49.0, 49.0)];
-		[path applyTransform:t];
-		[paths addObject:path];
-	}
-
-	// 中间横杠（长 126pt = 灵动岛长度，高 40pt，圆角 20）
-	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 63.0, 28.0, 126.0, 40.0)
-														cornerRadius:20.0];
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx - 83.5, 30.8, 41.0, 41.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
 
-	// 右端桃尖（大圆、圆心偏下：上缘与横杠齐平、下缘下垂，视觉为朝右下的桃尖）
+	// 中间横杠（长 126pt = 灵动岛长度，粗 34pt，圆角 17）
 	{
-		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 50.0, 28.3, 52.0, 52.0)];
+		UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(cx - 63.0, 28.0, 126.0, 34.0)
+														cornerRadius:17.0];
+		[path applyTransform:t];
+		[paths addObject:path];
+	}
+
+	// 右端瓣（与左瓣等大，圆心 = 横杠右端点，低于中线 4pt：上缘与横杠齐平、下缘微垂）
+	{
+		UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(cx + 42.5, 28.5, 41.0, 41.0)];
 		[path applyTransform:t];
 		[paths addObject:path];
 	}
